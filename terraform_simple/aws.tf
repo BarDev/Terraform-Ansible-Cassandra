@@ -45,6 +45,11 @@ provider "aws" {
 # Data
 # *************************************************************
 
+# Get Availability Zones
+data "aws_availability_zones" "azs" {
+    state = "available"
+}
+
 # Find the newest AWS Ubuntu AMI
 data "aws_ami" "aws_ubuntu" {
   most_recent = true
@@ -75,14 +80,8 @@ data "aws_ami" "aws_ubuntu" {
 # Resources
 # *************************************************************
 
-# This uses the default VPC.  It WILL NOT delete it on destroy.
-# This is a quick way to get something up and running.
-# Creating a VPC is recommeded
-# resource "aws_default_vpc" "default" {
 
-# }
-
-
+# Create AWS VPC
 resource "aws_vpc" "terraform_learning_vpc" {
   cidr_block = "10.0.0.0/22"
 
@@ -94,45 +93,80 @@ resource "aws_vpc" "terraform_learning_vpc" {
   )
 }
 
-
-# AWS Secuirty Group for DataStax Enterprise
-resource "aws_security_group" "sg_dse_node" {
-   name = "terraform_learning_dse_sg"
-   vpc_id = aws_vpc.terraform_learning_vpc.id
-
-   # Outbound: All DSE nodes can communicate together 
-   egress {
-     from_port = 0
-     to_port = 0
-     protocol = "-1"
-     self = true
-   }
-
-   # Inboud: All DSE nodes can communicate together 
-   ingress {
-      from_port = 0
-      to_port = 0
-      protocol = "-1"
-      self = true
-   }
+# Create a subnet for the AZ within the regional VPC
+resource "aws_subnet" "terraform_learning_subnets" {
+  count = 3
+  vpc_id     = aws_vpc.terraform_learning_vpc.id
+  cidr_block = cidrsubnet(aws_vpc.terraform_learning_vpc.cidr_block, 2, count.index)
+  availability_zone = data.aws_availability_zones.azs.names[count.index]
   tags = merge(
     var.default_tags,
     {
-     
+      "Name" = "terraform_learning_Subnet_${count.index}" 
     }
   )
 }
 
 
+# All nodes DSE nodes can communicate together
+resource "aws_security_group" "sg_dse_node" {
+   name = "terraform_learning_dse_sg"
+   vpc_id = aws_vpc.terraform_learning_vpc.id
+
+   egress {
+     from_port = 0
+     to_port = 0
+     protocol = "-1"
+     self = true # This what makes it work
+   }
+
+   ingress {
+      from_port = 0
+      to_port = 0
+      protocol = "-1"
+      self = true  # This what makes it work
+   }
+
+  tags = merge(
+   var.default_tags,
+   {
+    "Name" = "terraform_learning_dse_sg"
+   }
+  )
+}
+
+# Create Security to Acccess Nodes over SSh
+resource "aws_security_group" "sg_admin" {
+   name = "terraform_learning_admin_sg"
+   vpc_id = aws_vpc.terraform_learning_vpc.id
+
+   ingress {
+      from_port = 22
+      to_port = 22
+      protocol = "tcp"
+      cidr_blocks = ["0.0.0.0/0"]
+   }
+
+   tags = merge(
+   var.default_tags,
+   {
+    "Name" = "terraform_learning_dse_sg"
+   }
+  )
+}
 # *************************************************************
 # Outputs
 # *************************************************************
-output "default_tags" {
-  value = var.default_tags
-}
+# output "default_tags" {
+#   value = var.default_tags
+# }
 
-output "ubuntu_ami" {
-  value = data.aws_ami.aws_ubuntu
-}
+# output "ubuntu_ami" {
+#   value = data.aws_ami.aws_ubuntu
+# }
 
+
+output "AZs" {
+  value = data.aws_availability_zones.azs
+}
 
