@@ -83,7 +83,7 @@ data "aws_ami" "aws_ubuntu" {
 
 # Create AWS VPC
 resource "aws_vpc" "terraform_learning_vpc" {
-  cidr_block = "10.0.0.0/22"
+  cidr_block = "10.0.0.0/24"
 
   tags = merge(
    var.default_tags,
@@ -97,7 +97,7 @@ resource "aws_vpc" "terraform_learning_vpc" {
 resource "aws_subnet" "terraform_learning_subnets" {
   count = 3
   vpc_id     = aws_vpc.terraform_learning_vpc.id
-  cidr_block = cidrsubnet(aws_vpc.terraform_learning_vpc.cidr_block, 2, count.index)
+  cidr_block = cidrsubnet(aws_vpc.terraform_learning_vpc.cidr_block, 2, count.index) # "10.0.0.0/24"
   availability_zone = data.aws_availability_zones.azs.names[count.index]
   tags = merge(
     var.default_tags,
