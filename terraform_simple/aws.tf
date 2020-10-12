@@ -31,6 +31,10 @@ variable "default_tags" {
   } 
 }
 
+variable "instance_type" {
+  default = "c5a.xlarge" # 4 vCPUs, 8 GB Memory
+}
+
 # *************************************************************
 # Providers
 # *************************************************************
@@ -82,7 +86,7 @@ data "aws_ami" "aws_ubuntu" {
 
 
 # Create AWS VPC
-resource "aws_vpc" "terraform_learning_vpc" {
+resource "aws_vpc" "vpc" {
   cidr_block = "10.0.0.0/24"
 
   tags = merge(
@@ -93,11 +97,11 @@ resource "aws_vpc" "terraform_learning_vpc" {
   )
 }
 
-# Create a subnet for the AZ within the regional VPC
-resource "aws_subnet" "terraform_learning_subnets" {
+# Create a 3 subnets in 3 different
+resource "aws_subnet" "sbn" {
   count = 3
-  vpc_id     = aws_vpc.terraform_learning_vpc.id
-  cidr_block = cidrsubnet(aws_vpc.terraform_learning_vpc.cidr_block, 2, count.index) # "10.0.0.0/24"
+  vpc_id     = aws_vpc.vpc.id
+  cidr_block = cidrsubnet(aws_vpc.vpc.cidr_block, 2, count.index) # 10.0.0.0/26, 10.0.0.64/26, 10.0.0.128/26
   availability_zone = data.aws_availability_zones.azs.names[count.index]
   tags = merge(
     var.default_tags,
@@ -111,20 +115,13 @@ resource "aws_subnet" "terraform_learning_subnets" {
 # All nodes DSE nodes can communicate together
 resource "aws_security_group" "sg_dse_node" {
    name = "terraform_learning_dse_sg"
-   vpc_id = aws_vpc.terraform_learning_vpc.id
-
-   egress {
-     from_port = 0
-     to_port = 0
-     protocol = "-1"
-     self = true # This what makes it work
-   }
+   vpc_id = aws_vpc.vpc.id
 
    ingress {
       from_port = 0
       to_port = 0
       protocol = "-1"
-      self = true  # This what makes it work
+      self = true  # Incomming traffic must be initiated from instances in this Security Group
    }
 
   tags = merge(
@@ -138,7 +135,7 @@ resource "aws_security_group" "sg_dse_node" {
 # Create Security to Acccess Nodes over SSh
 resource "aws_security_group" "sg_admin" {
    name = "terraform_learning_admin_sg"
-   vpc_id = aws_vpc.terraform_learning_vpc.id
+   vpc_id = aws_vpc.vpc.id
 
    ingress {
       from_port = 22
@@ -147,13 +144,87 @@ resource "aws_security_group" "sg_admin" {
       cidr_blocks = ["0.0.0.0/0"]
    }
 
-   tags = merge(
-   var.default_tags,
-   {
-    "Name" = "terraform_learning_dse_sg"
+   egress {
+     from_port = 0
+     to_port = 0
+     protocol = "-1"
+     cidr_blocks = ["0.0.0.0/0"] # Can initiate outbound connection to any IP, including the internet
    }
+
+   tags = merge(
+     var.default_tags,
+     {
+       "Name" = "terraform_learning_dse_sg"
+     }
+   )
+}
+
+# Create Internet Gateway
+resource "aws_internet_gateway" "igw" {
+  vpc_id = aws_vpc.vpc.id
+
+    tags = merge(
+     var.default_tags,
+     {
+       "Name" = "terraform_learning_igw"
+     }
+   )
+}
+
+# Create for traffic to get to the internet
+# FYI: When VPC is created, a default route table is also created.
+#      All Subnets not explicitly associated with a route table will be inplicitly associated
+#      with the default route table 
+resource "aws_route" "rt_igw" {
+  route_table_id = aws_vpc.vpc.default_route_table_id
+  destination_cidr_block = "0.0.0.0/0"
+  gateway_id = aws_internet_gateway.igw.id
+}
+
+# Not need since any subnet not associated w/ a route table are implicitly associated 
+# with default route table
+# resource "aws_route_table_association" "a" {
+#   route_table_id = aws_vpc.vpc.default_route_table_id
+#   subnet_id  =  aws_subnet.sbn[0].id
+#}
+
+resource "aws_instance" "dse" {
+  ami = data.aws_ami.aws_ubuntu.id
+  instance_type = "c5.xlarge"
+  count = 3
+  subnet_id = aws_subnet.sbn[count.index].id
+  availability_zone =  data.aws_availability_zones.azs.names[count.index]
+  associate_public_ip_address = true
+  security_groups = [aws_security_group.sg_dse_node.id,aws_security_group.sg_admin.id]
+  key_name = var.key_name
+    
+  tags = merge(
+    var.default_tags,
+    {
+      "Name" = "terraform_learning_${count.index}" 
+    }
   )
 }
+
+# Create and Assing Static Public IP to Each Instance
+resource "aws_eip" "eip" {
+  vpc = true
+  count = 3
+
+  instance = aws_instance.dse[count.index].id
+  depends_on = [aws_internet_gateway.igw]
+  tags = merge(
+    var.default_tags,
+    {
+        "Name" = "terraform_learning_EIP_${count.index}" 
+    }
+  )
+}
+
+
+
+
+
 # *************************************************************
 # Outputs
 # *************************************************************
@@ -164,7 +235,6 @@ resource "aws_security_group" "sg_admin" {
 # output "ubuntu_ami" {
 #   value = data.aws_ami.aws_ubuntu
 # }
-
 
 output "AZs" {
   value = data.aws_availability_zones.azs
