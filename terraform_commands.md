@@ -4,8 +4,10 @@ terraform apply
 terraform plan --help
 terraform plan
 terraform plan -out example.plan
+terraform plan -var-file barlow.tfvars -out tf.plan
 terraform plan -destroy
 terraform plan -destroy -out example.plan
+
 terraform show example.plan
 terraform apply example.plan
 terraform state list
@@ -21,5 +23,8 @@ terraform apply -var-file "sensitive.tfvars"
 
 terraform refresh
 
+terraform destroy
+terraform destroy -var-file barlow.tfvars
 terraform destroy -target aws_instance.nginx
+
 ```

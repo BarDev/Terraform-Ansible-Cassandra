@@ -16,7 +16,7 @@ variable "key_private_loc" {
 # Key Name in AWS that relates to the "key_private_loc" above
 variable "key_name" {
     type = string
-    default = "barlow_kp" 
+    default = "barlow_kp"
 }
 
 # DataStax Tagging Requirments
@@ -78,14 +78,11 @@ data "aws_ami" "aws_ubuntu" {
 # This uses the default VPC.  It WILL NOT delete it on destroy.
 # This is a quick way to get something up and running.
 # Creating a VPC is recommeded
-# resource "aws_default_vpc" "default" {
-
-# }
+# resource "aws_default_vpc" "default" { }
 
 
 resource "aws_vpc" "terraform_learning_vpc" {
   cidr_block = "10.0.0.0/22"
-
   tags = merge(
    var.default_tags,
    {
@@ -97,7 +94,7 @@ resource "aws_vpc" "terraform_learning_vpc" {
 
 # AWS Secuirty Group for DataStax Enterprise
 resource "aws_security_group" "sg_dse_node" {
-   name = "terraform_learning_dse_sg"
+   Name = "terraform_learning_dse_sg"
    vpc_id = aws_vpc.terraform_learning_vpc.id
 
    # Outbound: All DSE nodes can communicate together 
@@ -115,6 +112,9 @@ resource "aws_security_group" "sg_dse_node" {
       protocol = "-1"
       self = true
    }
+
+
+
 
   #  # DSEFS inter-node communication port
   #  ingress {

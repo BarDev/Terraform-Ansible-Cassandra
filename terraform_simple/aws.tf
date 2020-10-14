@@ -4,35 +4,41 @@
 
 # Region where this infrastructure will be created
 variable "region" {
-  default = "us-east-1"
+    # default = "us-east-1"
 }
 
 # Location of Private key to SSH into instance
 variable "key_private_loc" {
     type = string
-    default = "/Users/mikebarlow/.ssh/aws_datastax_barlow_kp.pem"
+    # default = "/Users/mikebarlow/.ssh/aws_datastax_barlow_kp.pem"
 }
 
 # Key Name in AWS that relates to the "key_private_loc" above
 variable "key_name" {
     type = string
-    default = "barlow_kp" 
-}
+    # default = "barlow_kp" 
+} 
 
 # DataStax Tagging Requirments
 # https://docs.google.com/document/d/1lWixJ2Nl94Ta0ravVAolqMqHbzzoHsODpiYKcqkK-DM
 variable "default_tags" {
-  type    = map
-  default = {
-    Owner: "mike.barlow@datastax.com"
-    Purpose: "Learning Terraform"
-    NeededUntil: "10/12/2020"
-    Project: "Learning Terraform"
-  } 
+    type = map (string)
+    # default = {
+    #   Owner: "mike.barlow@company.com"
+    #   Purpose: "Learning Terraform"
+    #   NeededUntil: "10/12/2020"
+    #   Project: "Learning Terraform"
+    # } 
 }
 
 variable "instance_type" {
+  type = string
   default = "c5a.xlarge" # 4 vCPUs, 8 GB Memory
+}
+
+variable "instance_count" {
+  type = number
+  default = 3
 }
 
 # *************************************************************
@@ -40,9 +46,9 @@ variable "instance_type" {
 # *************************************************************
 
 provider "aws" {
-  region  = var.region
-  # shared_credentials_file = "/Users/<user name>/.aws/credentials" # Optional
-  profile = "fieldops"
+    region  = var.region
+    # shared_credentials_file = "/Users/<user name>/.aws/credentials" # Optional
+    profile = "fieldops"
 }
 
 # *************************************************************
@@ -56,29 +62,25 @@ data "aws_availability_zones" "azs" {
 
 # Find the newest AWS Ubuntu AMI
 data "aws_ami" "aws_ubuntu" {
-  most_recent = true
-  owners = ["099720109477"]
+    most_recent = true
+    owners = ["099720109477"]   
+    filter {
+      name = "name"
+      values = ["ubuntu/images/hvm-ssd/ubuntu-focal-20.04-amd64-server-*"]
+    }   
+    filter {
+      name = "root-device-type"
+      values = ["ebs"]
+    }   
+    filter {
+      name = "architecture"
+      values = ["x86_64"]
+    }   
+    filter {
+      name = "virtualization-type"
+      values = ["hvm"]
+    }
 
-  filter {
-    name = "name"
-    values = ["ubuntu/images/hvm-ssd/ubuntu-focal-20.04-amd64-server-*"]
-  }
-
-  filter {
-    name = "root-device-type"
-    values = ["ebs"]
-  }
-
-  filter {
-    name = "architecture"
-    values = ["x86_64"]
-  }
-
-  filter {
-    name = "virtualization-type"
-    values = ["hvm"]
-  }
-}
 
 # *************************************************************
 # Resources
@@ -112,7 +114,7 @@ resource "aws_subnet" "sbn" {
 }
 
 
-# All nodes DSE nodes can communicate together
+# Allows all DSE nodes can communicate together
 resource "aws_security_group" "sg_dse_node" {
    name = "terraform_learning_dse_sg"
    vpc_id = aws_vpc.vpc.id
@@ -132,7 +134,7 @@ resource "aws_security_group" "sg_dse_node" {
   )
 }
 
-# Create Security to Acccess Nodes over SSh
+# Create Security to Acccess Nodes over SSH
 resource "aws_security_group" "sg_admin" {
    name = "terraform_learning_admin_sg"
    vpc_id = aws_vpc.vpc.id
@@ -159,6 +161,7 @@ resource "aws_security_group" "sg_admin" {
    )
 }
 
+
 # Create Internet Gateway
 resource "aws_internet_gateway" "igw" {
   vpc_id = aws_vpc.vpc.id
@@ -171,7 +174,7 @@ resource "aws_internet_gateway" "igw" {
    )
 }
 
-# Create for traffic to get to the internet
+# Created for traffic to get to and from the internet
 # FYI: When VPC is created, a default route table is also created.
 #      All Subnets not explicitly associated with a route table will be inplicitly associated
 #      with the default route table 
@@ -181,19 +184,12 @@ resource "aws_route" "rt_igw" {
   gateway_id = aws_internet_gateway.igw.id
 }
 
-# Not need since any subnet not associated w/ a route table are implicitly associated 
-# with default route table
-# resource "aws_route_table_association" "a" {
-#   route_table_id = aws_vpc.vpc.default_route_table_id
-#   subnet_id  =  aws_subnet.sbn[0].id
-#}
-
 resource "aws_instance" "dse" {
   ami = data.aws_ami.aws_ubuntu.id
-  instance_type = "c5.xlarge"
-  count = 3
-  subnet_id = aws_subnet.sbn[count.index].id
-  availability_zone =  data.aws_availability_zones.azs.names[count.index]
+  instance_type = var.instance_type
+  count = var.instance_count
+  subnet_id = aws_subnet.sbn[count.index % var.instance_count].id
+  availability_zone = data.aws_availability_zones.azs.names[count.index % var.instance_count]
   associate_public_ip_address = true
   security_groups = [aws_security_group.sg_dse_node.id,aws_security_group.sg_admin.id]
   key_name = var.key_name
@@ -221,10 +217,6 @@ resource "aws_eip" "eip" {
   )
 }
 
-
-
-
-
 # *************************************************************
 # Outputs
 # *************************************************************
@@ -236,7 +228,10 @@ resource "aws_eip" "eip" {
 #   value = data.aws_ami.aws_ubuntu
 # }
 
-output "AZs" {
-  value = data.aws_availability_zones.azs
-}
+# output "AZs" {
+#   value = data.aws_availability_zones.azs
+# }
 
+output "public_ips" {
+    value = aws_instance.dse[*].public_ip
+}
