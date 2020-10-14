@@ -46,7 +46,7 @@ variable "instance_count" {
 # *************************************************************
 
 provider "aws" {
-    region  = var.region
+    region = var.region
     # shared_credentials_file = "/Users/<user name>/.aws/credentials" # Optional
     profile = "fieldops"
 }
@@ -80,7 +80,7 @@ data "aws_ami" "aws_ubuntu" {
       name = "virtualization-type"
       values = ["hvm"]
     }
-
+}
 
 # *************************************************************
 # Resources
@@ -188,8 +188,8 @@ resource "aws_instance" "dse" {
   ami = data.aws_ami.aws_ubuntu.id
   instance_type = var.instance_type
   count = var.instance_count
-  subnet_id = aws_subnet.sbn[count.index % var.instance_count].id
-  availability_zone = data.aws_availability_zones.azs.names[count.index % var.instance_count]
+  subnet_id = aws_subnet.sbn[count.index % 3].id
+  availability_zone = data.aws_availability_zones.azs.names[count.index % 3]
   associate_public_ip_address = true
   security_groups = [aws_security_group.sg_dse_node.id,aws_security_group.sg_admin.id]
   key_name = var.key_name

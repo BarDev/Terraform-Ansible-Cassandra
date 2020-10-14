@@ -19,6 +19,6 @@ default_tags = {
     Project: "Learning Terraform"
   } 
 
-instance_type = "c5a.xlarge" # 4 vCPUs, 8 GB Memory
+instance_type = "c5.xlarge" # 4 vCPUs, 8 GB Memory
 
 instance_count = 3
