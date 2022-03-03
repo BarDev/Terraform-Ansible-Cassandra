@@ -2,6 +2,16 @@
 # Variables
 # *************************************************************
 
+# Outside IP's
+variable "outside_ips" {
+    type = list(string)
+}
+ 
+# Name of VPC; and prefix for other items
+variable "name" {
+    type = string
+}
+
 # Region where this infrastructure will be created
 variable "region" {
     # default = "us-east-1"
@@ -10,24 +20,24 @@ variable "region" {
 # Location of Private key to SSH into instance
 variable "key_private_loc" {
     type = string
-    # default = "/Users/mikebarlow/.ssh/aws_datastax_barlow_kp.pem"
+    # default = "/Users/mb/.ssh/aws_kp.pem"
 }
 
 # Key Name in AWS that relates to the "key_private_loc" above
 variable "key_name" {
     type = string
-    # default = "barlow_kp" 
+    # default = "kp" 
 } 
 
-# DataStax Tagging Requirments
+# Tagging Requirments
 # https://docs.google.com/document/d/1lWixJ2Nl94Ta0ravVAolqMqHbzzoHsODpiYKcqkK-DM
 variable "default_tags" {
     type = map (string)
     # default = {
-    #   Owner: "mike.barlow@company.com"
-    #   Purpose: "Learning Terraform"
+    #   Owner: "mike"
+    #   Purpose: ""
     #   NeededUntil: "10/12/2020"
-    #   Project: "Learning Terraform"
+    #   Project: ""
     # } 
 }
 
@@ -48,7 +58,7 @@ variable "instance_count" {
 provider "aws" {
     region = var.region
     # shared_credentials_file = "/Users/<user name>/.aws/credentials" # Optional
-    profile = "fieldops"
+    profile = "default"
 }
 
 # *************************************************************
@@ -94,7 +104,7 @@ resource "aws_vpc" "vpc" {
   tags = merge(
    var.default_tags,
    {
-    "Name" = "terraform_learning_internal_vpc"
+    "Name" = var.name
    }
   )
 }
@@ -108,15 +118,15 @@ resource "aws_subnet" "sbn" {
   tags = merge(
     var.default_tags,
     {
-      "Name" = "terraform_learning_Subnet_${count.index}" 
+      "Name" = "${var.name}_subnet_${count.index}" 
     }
   )
 }
 
 
-# Allows all DSE nodes can communicate together
-resource "aws_security_group" "sg_dse_node" {
-   name = "terraform_learning_dse_sg"
+# Allows all nodes can communicate together
+resource "aws_security_group" "sg_node" {
+   name = "${var.name}_sg"
    vpc_id = aws_vpc.vpc.id
 
    ingress {
@@ -129,21 +139,21 @@ resource "aws_security_group" "sg_dse_node" {
   tags = merge(
    var.default_tags,
    {
-    "Name" = "terraform_learning_dse_sg"
+    "Name" = "${var.name}_sg"
    }
   )
 }
 
 # Create Security to Acccess Nodes over SSH
 resource "aws_security_group" "sg_admin" {
-   name = "terraform_learning_admin_sg"
+   name = "${var.name}_admin_sg"
    vpc_id = aws_vpc.vpc.id
 
    ingress {
-      from_port = 22
-      to_port = 22
+      from_port = 0
+      to_port = 65535
       protocol = "tcp"
-      cidr_blocks = ["0.0.0.0/0"]
+      cidr_blocks = var.outside_ips
    }
 
    egress {
@@ -156,7 +166,7 @@ resource "aws_security_group" "sg_admin" {
    tags = merge(
      var.default_tags,
      {
-       "Name" = "terraform_learning_dse_sg"
+       "Name" = "${var.name}_admin_sg"
      }
    )
 }
@@ -169,35 +179,52 @@ resource "aws_internet_gateway" "igw" {
     tags = merge(
      var.default_tags,
      {
-       "Name" = "terraform_learning_igw"
+       "Name" = "${var.name}_igw"
      }
    )
+}
+
+
+
+# I'm using this to set tags for the default Route Table
+# FYI: When VPC is created, a default route table is also created.
+#      All Subnets not explicitly associated with a route table will be inplicitly associated
+#      with the default route table 
+resource "aws_default_route_table" "default_route" {
+  default_route_table_id = aws_vpc.vpc.default_route_table_id
+  tags = merge(
+    var.default_tags,
+    {
+      "Name" = "${var.name}_default_rt"
+    }
+  )
 }
 
 # Created for traffic to get to and from the internet
 # FYI: When VPC is created, a default route table is also created.
 #      All Subnets not explicitly associated with a route table will be inplicitly associated
 #      with the default route table 
-resource "aws_route" "rt_igw" {
+resource "aws_route" "route_igw" {
   route_table_id = aws_vpc.vpc.default_route_table_id
   destination_cidr_block = "0.0.0.0/0"
   gateway_id = aws_internet_gateway.igw.id
 }
 
-resource "aws_instance" "dse" {
+
+resource "aws_instance" "instance" {
   ami = data.aws_ami.aws_ubuntu.id
   instance_type = var.instance_type
   count = var.instance_count
   subnet_id = aws_subnet.sbn[count.index % 3].id
   availability_zone = data.aws_availability_zones.azs.names[count.index % 3]
   associate_public_ip_address = true
-  security_groups = [aws_security_group.sg_dse_node.id,aws_security_group.sg_admin.id]
+  security_groups = [aws_security_group.sg_node.id,aws_security_group.sg_admin.id]
   key_name = var.key_name
     
   tags = merge(
     var.default_tags,
     {
-      "Name" = "terraform_learning_${count.index}" 
+      "Name" = "${var.name}_${count.index}" 
     }
   )
 }
@@ -207,12 +234,12 @@ resource "aws_eip" "eip" {
   vpc = true
   count = 3
 
-  instance = aws_instance.dse[count.index].id
+  instance = aws_instance.instance[count.index].id
   depends_on = [aws_internet_gateway.igw]
   tags = merge(
     var.default_tags,
     {
-        "Name" = "terraform_learning_EIP_${count.index}" 
+        "Name" = "${var.name}_eip_${count.index}" 
     }
   )
 }
@@ -232,6 +259,15 @@ resource "aws_eip" "eip" {
 #   value = data.aws_availability_zones.azs
 # }
 
-output "public_ips" {
-    value = aws_instance.dse[*].public_ip
+# output "public_ips" {
+#   value = aws_instance.instance.*.public_ip
+# }
+
+output "eips" {
+  value = aws_eip.eip.*.public_ip
 }
+
+output "private_ips" {
+  value = aws_instance.instance[*].private_ip
+}
+
