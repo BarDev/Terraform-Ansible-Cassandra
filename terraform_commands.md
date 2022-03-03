@@ -1,5 +1,11 @@
 ```
 terraform init
+terraform plan -var-file barlow.tfvars -out tf.plan
+terraform apply tf.plan
+terraform destroy -var-file barlow.tfvars
+
+***** Others
+terraform init
 terraform apply
 terraform plan --help
 terraform plan
