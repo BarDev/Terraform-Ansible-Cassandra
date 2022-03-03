@@ -10,16 +10,16 @@ variable "region" {
 # Location of Private key to SSH into instance
 variable "key_private_loc" {
     type = string
-    default = "/Users/mikebarlow/.ssh/aws_datastax_barlow_kp.pem"
+    # default = "/Users/mb/.ssh/aws_kp.pem"
 }
 
 # Key Name in AWS that relates to the "key_private_loc" above
 variable "key_name" {
     type = string
-    default = "barlow_kp"
+    # default = "kp"
 }
 
-# DataStax Tagging Requirments
+# Tagging
 # https://docs.google.com/document/d/1lWixJ2Nl94Ta0ravVAolqMqHbzzoHsODpiYKcqkK-DM
 variable "default_tags" {
   type    = map
@@ -38,7 +38,7 @@ variable "default_tags" {
 provider "aws" {
   region  = var.region
   # shared_credentials_file = "/Users/<user name>/.aws/credentials" # Optional
-  profile = "fieldops"
+  # profile = "fieldops"
 }
 
 # *************************************************************
