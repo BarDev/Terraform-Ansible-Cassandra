@@ -1,2 +1,4 @@
-# Terraform Ansible Cassandra
-How to use Terraform and Ansible to Setup Cassandra and DataStax Enterprise (DSE)
+# Terraform ]
+How to use Terraform to AWS infrastructure 
+
+TODO - Include Ansible
