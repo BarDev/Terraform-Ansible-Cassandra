@@ -4,19 +4,19 @@
 
 # Region where this infrastructure will be created
 variable "region" {
-  default = "us-east-1"
+  default = "us-east-2"
 }
 
 # Location of Private key to SSH into instance
 variable "key_private_loc" {
     type = string
-    # default = "/Users/mb/.ssh/aws_kp.pem"
+    default = "/Users/mikebarlow/.ssh/aws-us-east-2-barlow-kp.pem"
 }
 
 # Key Name in AWS that relates to the "key_private_loc" above
 variable "key_name" {
     type = string
-    # default = "kp"
+    default = "barlow-kp"
 }
 
 # Tagging
@@ -24,7 +24,7 @@ variable "key_name" {
 variable "default_tags" {
   type    = map
   default = {
-    Owner: "mike.barlow@datastax.com"
+    Owner: "Mike Barlow"
     Purpose: "Learning Terraform"
     NeededUntil: "10/12/2020"
     Project: "Learning Terraform"
@@ -38,7 +38,7 @@ variable "default_tags" {
 provider "aws" {
   region  = var.region
   # shared_credentials_file = "/Users/<user name>/.aws/credentials" # Optional
-  # profile = "fieldops"
+  profile = "default"
 }
 
 # *************************************************************
@@ -94,7 +94,7 @@ resource "aws_vpc" "terraform_learning_vpc" {
 
 # AWS Secuirty Group for DataStax Enterprise
 resource "aws_security_group" "sg_dse_node" {
-   Name = "terraform_learning_dse_sg"
+   name = "terraform_learning_dse_sg"
    vpc_id = aws_vpc.terraform_learning_vpc.id
 
    # Outbound: All DSE nodes can communicate together 
@@ -112,99 +112,6 @@ resource "aws_security_group" "sg_dse_node" {
       protocol = "-1"
       self = true
    }
-
-
-
-
-  #  # DSEFS inter-node communication port
-  #  ingress {
-  #     from_port = 5599 
-  #     to_port = 5599
-  #     protocol = "tcp"
-  #     security_groups = [aws_security_group.sg_internal_only.id]
-  #  }
-
-  #  # DSE inter-node cluster communication port
-  #  # - 7000: No SSL
-  #  # - 7001: With SSL
-  #  ingress {
-  #     from_port = 7000
-  #     to_port = 7001
-  #     protocol = "tcp"
-  #     security_groups = [aws_security_group.sg_internal_only.id]
-  #  }
-
-  #  # Spark master inter-node communication port
-  #  ingress {
-  #     from_port = 7077
-  #     to_port = 7077
-  #     protocol = "tcp"
-  #     security_groups = [aws_security_group.sg_internal_only.id]
-  #  }
-
-  #  # JMX monitoring port
-  #  ingress {
-  #     from_port = 7199
-  #     to_port = 7199
-  #     protocol = "tcp"
-  #     security_groups = [aws_security_group.sg_internal_only.id]
-  #  }
-
-  #  # Port for inter-node messaging service
-  #  ingress {
-  #     from_port = 8609
-  #     to_port = 8609
-  #     protocol = "tcp"
-  #     security_groups = [aws_security_group.sg_internal_only.id]
-  #  }
-
-  #  # DSE Search web access port
-  #  ingress {
-  #     from_port = 8983
-  #     to_port = 8983
-  #     protocol = "tcp"
-  #     security_groups = [aws_security_group.sg_internal_only.id]
-  #  }
-
-  #  # Native transport port
-  #  ingress {
-  #     from_port = 9042
-  #     to_port = 9042
-  #     protocol = "tcp"
-  #     security_groups = [aws_security_group.sg_internal_only.id]
-  #  }
-
-  #  # Native transport port, with SSL
-  #  ingress {
-  #     from_port = 9142
-  #     to_port = 9142
-  #     protocol = "tcp"
-  #     security_groups = [aws_security_group.sg_internal_only.id]
-  #  }
-
-  #  # Client (Thrift) port
-  #  ingress {
-  #     from_port = 9160
-  #     to_port = 9160
-  #     protocol = "tcp"
-  #     security_groups = [aws_security_group.sg_internal_only.id]
-  #  }
-
-  #  # Spark SQL Thrift server port
-  #  ingress {
-  #     from_port = 10000
-  #     to_port = 10000
-  #     protocol = "tcp"
-  #     security_groups = [aws_security_group.sg_internal_only.id]
-  #  }
-
-  #  # Stomp port: opsc -> agent
-  #  ingress {
-  #     from_port = 61621
-  #     to_port = 61621
-  #     protocol = "tcp"
-  #     security_groups = [aws_security_group.sg_internal_only.id]
-  #  }
 
   tags = merge(
     var.default_tags,
